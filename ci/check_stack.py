@@ -16,6 +16,9 @@ APP_GROUPS = {"app-drive", "app-push", "app-fit", "app-flow", "app-calendar", "a
 OIDC_SLUGS = ("everdrive", "everpush", "everfit", "everflow")
 
 
+PUBLIC_HOST = "id.everbright.it"
+
+
 class Client:
     def __init__(self, base):
         self.base = base.rstrip("/")
@@ -25,10 +28,13 @@ class Client:
     def csrf(self):
         return next((c.value for c in self.jar if c.name == "authentik_csrf"), "")
 
-    def json(self, path, body=None):
+    def json(self, path, body=None, public=false`):
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(self.base + path, data=data, headers={
-            "Content-Type": "application/json", "Accept": "application/json", "X-authentik-CSRF": self.csrf()})
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "X-authentik-CSRF": self.csrf()}
+        if public:
+            # Headers Caddy sends in production: the issuer follows the public host and scheme.
+            headers.update({"Host": PUBLIC_HOST, "X-Forwarded-Proto": "https"})
+        req = urllib.request.Request(self.base + path, data=data, headers=headers)
         with self.opener.open(req, timeout=30) as response:
             return json.load(response)
 
@@ -68,8 +74,8 @@ def main():
     wait_ready(client)
 
     for slug in OIDC_SLUGS:
-        issuer = client.json(f"/application/o/{slug}/.well-known/openid-configuration")["issuer"]
-        assert issuer == f"https://id.everbright.it/application/o/{slug}/", issuer
+        issuer = client.json(f"/application/o/{slug}/.well-known/openid-configuration", public=True)["issuer"]
+        assert issuer == f"https://{PUBLIC_HOST}/application/o/{slug}/", issuer
         print("discovery", slug, issuer)
 
     login(client, os.environ["EVERID_ADMIN_PASSWORD"])
