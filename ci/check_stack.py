@@ -28,7 +28,7 @@ class Client:
     def csrf(self):
         return next((c.value for c in self.jar if c.name == "authentik_csrf"), "")
 
-    def json(self, path, body=None, public=false`):
+    def json(self, path, body=None, public=False):
         data = json.dumps(body).encode() if body is not None else None
         headers = {"Content-Type": "application/json", "Accept": "application/json", "X-authentik-CSRF": self.csrf()}
         if public:
