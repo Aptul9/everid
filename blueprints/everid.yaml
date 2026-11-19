@@ -42,8 +42,9 @@ entries:
       domain: authentik-default
     attrs:
       branding_title: EverID
-      branding_logo: /everid-static/logo-icon.png
-      branding_favicon: /everid-static/icon.png
+      # File picker values (2025.12+) reject absolute paths; external URLs pass through unchanged.
+      branding_logo: https://id.everbright.it/everid-static/logo-icon.png
+      branding_favicon: https://id.everbright.it/everid-static/icon.png
       branding_custom_css: |
         :root {
           --pf-global--primary-color--100: #00b8db;
