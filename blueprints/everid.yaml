@@ -96,7 +96,7 @@ entries:
       name: Antonio
       email: aptul4ever@gmail.com
       type: internal
-      password: !Env [EVERID_ADMIN_PASSWORD]
+      password: !Env [EVERID_ADMIN_PASSWORD, null]
       attributes:
         settings:
           locale: it
@@ -131,7 +131,7 @@ entries:
       invalidation_flow: !Context flow_invalid
       client_type: confidential
       client_id: everdrive
-      client_secret: !Env [OIDC_SECRET_EVERDRIVE]
+      client_secret: !Env [OIDC_SECRET_EVERDRIVE, null]
       redirect_uris:
         - {matching_mode: strict, url: "https://drive.everbright.it/oidc/callback", redirect_uri_type: authorization}
         - {matching_mode: strict, url: "https://drive.everbright.it/", redirect_uri_type: logout}
@@ -169,7 +169,7 @@ entries:
       invalidation_flow: !Context flow_invalid
       client_type: confidential
       client_id: everpush
-      client_secret: !Env [OIDC_SECRET_EVERPUSH]
+      client_secret: !Env [OIDC_SECRET_EVERPUSH, null]
       redirect_uris:
         - {matching_mode: strict, url: "https://push.everbright.it/oidc/callback", redirect_uri_type: authorization}
         - {matching_mode: strict, url: "https://push.everbright.it/", redirect_uri_type: logout}
@@ -207,7 +207,7 @@ entries:
       invalidation_flow: !Context flow_invalid
       client_type: confidential
       client_id: everfit
-      client_secret: !Env [OIDC_SECRET_EVERFIT]
+      client_secret: !Env [OIDC_SECRET_EVERFIT, null]
       redirect_uris:
         - {matching_mode: strict, url: "https://fit.everbright.it/oidc/callback", redirect_uri_type: authorization}
         - {matching_mode: strict, url: "https://fit.everbright.it/", redirect_uri_type: logout}
@@ -245,7 +245,7 @@ entries:
       invalidation_flow: !Context flow_invalid
       client_type: confidential
       client_id: everflow
-      client_secret: !Env [OIDC_SECRET_EVERFLOW]
+      client_secret: !Env [OIDC_SECRET_EVERFLOW, null]
       redirect_uris:
         - {matching_mode: strict, url: "https://flow.everbright.it/oidc/callback", redirect_uri_type: authorization}
         - {matching_mode: strict, url: "https://flow.everbright.it/", redirect_uri_type: logout}
