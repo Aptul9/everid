@@ -1,0 +1,129 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Stack and blueprint
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Scripts and routing
+        run: |
+          bash -n ci/deploy.sh ci/rollback.sh ci/backup.sh ci/set-secrets.sh
+          python -m py_compile ci/check_stack.py
+          python -m unittest discover -s ci -p 'test_*.py'
+          if grep -nE '(password|secret|token): *[A-Za-z0-9+/]{16,}' blueprints/*.yaml; then
+            echo 'Literal secret in a blueprint' >&2; exit 1
+          fi
+      - name: Isolated test credentials
+        run: |
+          python - <<'PY'
+          import os, secrets
+          values = {n: secrets.token_urlsafe(36) for n in (
+              'PG_PASS', 'AUTHENTIK_SECRET_KEY', 'EVERID_ADMIN_PASSWORD',
+              'OIDC_SECRET_EVERDRIVE', 'OIDC_SECRET_EVERPUSH', 'OIDC_SECRET_EVERFIT', 'OIDC_SECRET_EVERFLOW')}
+          values['AUTHENTIK_BOOTSTRAP_PASSWORD'] = values['EVERID_ADMIN_PASSWORD']
+          ci = os.path.join(os.environ['RUNNER_TEMP'], 'everid')
+          os.makedirs(ci, exist_ok=True)
+          with open(os.path.join(ci, '.env'), 'w') as f:
+              for k, v in values.items():
+                  f.write(f'{k}={v}\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              for k, v in values.items():
+                  print('::add-mask::' + v)
+                  out.write(f'{k}={v}\n')
+              out.write(f'EVERID_ENV_FILE={ci}/.env\nEVERID_DATA_DIR={ci}/data\nEVERID_DB_DIR={ci}/postgres\nEVERID_OUTPOST_BIND=127.0.0.1\n')
+          PY
+      - name: Start the stack
+        run: |
+          mkdir -p "$EVERID_DATA_DIR" && sudo chown 1000:1000 "$EVERID_DATA_DIR"
+          docker build -f Dockerfile.caddy -t everid-web:local .
+          docker run --rm -e DOMAIN=id.example.com everid-web:local caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker compose --env-file "$EVERID_ENV_FILE" config --quiet
+          docker compose --env-file "$EVERID_ENV_FILE" up -d --wait --wait-timeout 300 postgresql server worker
+      - name: Stack matches the blueprint
+        run: python ci/check_stack.py --url http://127.0.0.1:9000
+      - name: Forward auth answers unauthenticated requests
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Host: calendar.everbright.it' -H 'X-Forwarded-Proto: https' \
+            -H 'X-Forwarded-Uri: /' -H 'X-Forwarded-Method: GET' http://127.0.0.1:9000/outpost.goauthentik.io/auth/caddy)
+          echo "forward auth unauthenticated: $code"
+          case "$code" in 302|401) ;; *) exit 1 ;; esac
+      - name: Logs without errors
+        if: always()
+        run: |
+          docker compose --env-file "$EVERID_ENV_FILE" ps
+          docker compose --env-file "$EVERID_ENV_FILE" logs --no-color server worker > stack.log 2>&1 || true
+          grep -E '"level": ?"error"|Traceback' stack.log | grep -v 'outpost' | head -20 || true
+          docker compose --env-file "$EVERID_ENV_FILE" down -v
+
+  deploy:
+    name: Deploy
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://id.everbright.it
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: SSH configuration
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Prepare release and runtime inputs
+        env:
+          PG_PASS: ${{ secrets.PG_PASS }}
+          AUTHENTIK_SECRET_KEY: ${{ secrets.AUTHENTIK_SECRET_KEY }}
+          EVERID_ADMIN_PASSWORD: ${{ secrets.EVERID_ADMIN_PASSWORD }}
+          OIDC_SECRET_EVERDRIVE: ${{ secrets.OIDC_SECRET_EVERDRIVE }}
+          OIDC_SECRET_EVERPUSH: ${{ secrets.OIDC_SECRET_EVERPUSH }}
+          OIDC_SECRET_EVERFIT: ${{ secrets.OIDC_SECRET_EVERFIT }}
+          OIDC_SECRET_EVERFLOW: ${{ secrets.OIDC_SECRET_EVERFLOW }}
+        run: |
+          for n in PG_PASS AUTHENTIK_SECRET_KEY EVERID_ADMIN_PASSWORD OIDC_SECRET_EVERDRIVE OIDC_SECRET_EVERPUSH OIDC_SECRET_EVERFIT OIDC_SECRET_EVERFLOW; do
+            test -n "${!n}" || { echo "missing secret $n" >&2; exit 1; }
+          done
+          umask 077
+          git archive --format=tar.gz HEAD > release.tar.gz
+          {
+            printf 'PG_PASS=%s\n' "$PG_PASS"
+            printf 'AUTHENTIK_SECRET_KEY=%s\n' "$AUTHENTIK_SECRET_KEY"
+            printf 'AUTHENTIK_BOOTSTRAP_PASSWORD=%s\n' "$EVERID_ADMIN_PASSWORD"
+            printf 'EVERID_ADMIN_PASSWORD=%s\n' "$EVERID_ADMIN_PASSWORD"
+            printf 'OIDC_SECRET_EVERDRIVE=%s\n' "$OIDC_SECRET_EVERDRIVE"
+            printf 'OIDC_SECRET_EVERPUSH=%s\n' "$OIDC_SECRET_EVERPUSH"
+            printf 'OIDC_SECRET_EVERFIT=%s\n' "$OIDC_SECRET_EVERFIT"
+            printf 'OIDC_SECRET_EVERFLOW=%s\n' "$OIDC_SECRET_EVERFLOW"
+          } > environment.new
+          ssh "$TARGET" 'install -d -m 700 /opt/everid'
+          scp release.tar.gz environment.new "$TARGET:/opt/everid/"
+      - name: Deploy from versioned script
+        run: ssh "$TARGET" "set -e; tar xzf /opt/everid/release.tar.gz -C /opt/everid ci/deploy.sh; bash /opt/everid/ci/deploy.sh '$GITHUB_SHA'"
+      - name: Public checks
+        run: |
+          curl --fail --silent --show-error -o /dev/null https://id.everbright.it/-/health/live/
+          curl --fail --silent --show-error -L https://id.everbright.it/ | grep -q 'EverID'
+          for slug in everdrive everpush everfit everflow; do
+            curl --fail --silent --show-error -o /dev/null "https://id.everbright.it/application/o/$slug/.well-known/openid-configuration"
+          done

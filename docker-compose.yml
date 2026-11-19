@@ -1,0 +1,101 @@
+name: everid
+
+x-authentik: &authentik
+  image: ghcr.io/goauthentik/server:2026.8.5
+  env_file:
+    - ${EVERID_ENV_FILE:-/opt/everid/.env}
+  environment:
+    AUTHENTIK_POSTGRESQL__HOST: postgresql
+    AUTHENTIK_POSTGRESQL__NAME: authentik
+    AUTHENTIK_POSTGRESQL__USER: authentik
+    AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:?PG_PASS required}
+    AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?AUTHENTIK_SECRET_KEY required}
+    AUTHENTIK_WEB__BASE_URL: https://id.everbright.it
+    AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+    # The proxy is Caddy in the same compose network; forwarded headers trusted only from there.
+    AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS: 10.25.95.170/8,10.111.234.192/12,10.126.209.120/16
+  depends_on:
+    postgresql:
+      condition: service_healthy
+  volumes:
+    - ${EVERID_DATA_DIR:-/opt/everid/data}:/data
+    - ./blueprints:/blueprints/custom:ro
+  shm_size: 512mb
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "2"
+
+services:
+  postgresql:
+    image: docker.io/library/postgres:16.16-alpine
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${PG_PASS:?PG_PASS required}
+    volumes:
+      - ${EVERID_DB_DIR:-/opt/everid/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -d authentik -U authentik]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "2"
+
+  server:
+    <<: *authentik
+    command: server
+    # docker0 address: reachable by the Caddy of every app on this VM (forward auth), not public.
+    ports:
+      - ${EVERID_OUTPOST_BIND:-172.17.0.1}:9000:9000
+    mem_limit: 1536m
+
+  worker:
+    <<: *authentik
+    command: worker
+    mem_limit: 1g
+
+  web:
+    image: everid-web:${RELEASE:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    environment:
+      DOMAIN: id.everbright.it
+    ports:
+      - 127.0.0.1:4451:8443
+    volumes:
+      - certificates:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+    read_only: true
+    tmpfs:
+      - /tmp:size=33554432,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    mem_limit: 256m
+    pids_limit: 100
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "2"
+
+volumes:
+  certificates:
+  caddy_config:

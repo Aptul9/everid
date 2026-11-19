@@ -1,0 +1,338 @@
+# EverID configuration. Applied by the worker at startup and on every file change.
+# Secrets come from the container environment (/opt/everid/.env), never from this file.
+version: 1
+metadata:
+  name: EverID
+  labels:
+    blueprints.goauthentik.io/description: Brand, groups, applications and access of EverID
+context:
+  flow_authz: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+  flow_invalid: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+entries:
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: authentik Bootstrap
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Brand
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Provider authorization flow (implicit consent)
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Default - Provider invalidation flow
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: System - OAuth2 Provider - Scopes
+      required: true
+
+  # Brand
+  - model: authentik_brands.brand
+    state: present
+    identifiers:
+      domain: authentik-default
+    attrs:
+      branding_title: EverID
+      branding_logo: /everid-static/logo-icon.png
+      branding_favicon: /everid-static/icon.png
+      branding_custom_css: |
+        :root {
+          --pf-global--primary-color--100: #00b8db;
+          --pf-global--primary-color--200: #0097b4;
+          --pf-global--link--Color: #00b8db;
+        }
+      attributes:
+        settings:
+          locale: it
+
+  # Groups
+  - model: authentik_core.group
+    id: everid-admins
+    identifiers:
+      name: everid-admins
+    attrs:
+      is_superuser: true
+  - model: authentik_core.group
+    id: app-drive
+    identifiers:
+      name: app-drive
+  - model: authentik_core.group
+    id: app-push
+    identifiers:
+      name: app-push
+  - model: authentik_core.group
+    id: app-fit
+    identifiers:
+      name: app-fit
+  - model: authentik_core.group
+    id: app-flow
+    identifiers:
+      name: app-flow
+  - model: authentik_core.group
+    id: app-calendar
+    identifiers:
+      name: app-calendar
+  - model: authentik_core.group
+    id: app-teams
+    identifiers:
+      name: app-teams
+
+  # Administrator. Password set only on creation; later changes happen in EverID.
+  - model: authentik_core.user
+    state: created
+    id: antonio
+    identifiers:
+      username: antonio
+    attrs:
+      name: Antonio
+      email: aptul4ever@gmail.com
+      type: internal
+      password: !Env [EVERID_ADMIN_PASSWORD]
+      attributes:
+        settings:
+          locale: it
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: antonio
+    attrs:
+      groups:
+        - !KeyOf everid-admins
+        - !KeyOf app-drive
+        - !KeyOf app-push
+        - !KeyOf app-fit
+        - !KeyOf app-flow
+        - !KeyOf app-calendar
+        - !KeyOf app-teams
+  # Built-in akadmin gets a bootstrap password (so the initial-setup flow stays closed), then is disabled.
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: akadmin
+    attrs:
+      is_active: false
+
+  # OIDC applications
+  - model: authentik_providers_oauth2.oauth2provider
+    id: everdrive-provider
+    identifiers:
+      name: EverDrive
+    attrs:
+      authorization_flow: !Context flow_authz
+      invalidation_flow: !Context flow_invalid
+      client_type: confidential
+      client_id: everdrive
+      client_secret: !Env [OIDC_SECRET_EVERDRIVE]
+      redirect_uris:
+        - {matching_mode: strict, url: "https://drive.everbright.it/oidc/callback", redirect_uri_type: authorization}
+        - {matching_mode: strict, url: "https://drive.everbright.it/", redirect_uri_type: logout}
+      sub_mode: hashed_user_id
+      issuer_mode: per_provider
+      include_claims_in_id_token: true
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+  - model: authentik_core.application
+    id: everdrive-app
+    identifiers:
+      slug: everdrive
+    attrs:
+      name: EverDrive
+      provider: !KeyOf everdrive-provider
+      meta_launch_url: https://drive.everbright.it/
+      open_in_new_tab: true
+      policy_engine_mode: any
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf everdrive-app
+      group: !KeyOf app-drive
+    attrs:
+      order: 0
+
+  - model: authentik_providers_oauth2.oauth2provider
+    id: everpush-provider
+    identifiers:
+      name: EverPush
+    attrs:
+      authorization_flow: !Context flow_authz
+      invalidation_flow: !Context flow_invalid
+      client_type: confidential
+      client_id: everpush
+      client_secret: !Env [OIDC_SECRET_EVERPUSH]
+      redirect_uris:
+        - {matching_mode: strict, url: "https://push.everbright.it/oidc/callback", redirect_uri_type: authorization}
+        - {matching_mode: strict, url: "https://push.everbright.it/", redirect_uri_type: logout}
+      sub_mode: hashed_user_id
+      issuer_mode: per_provider
+      include_claims_in_id_token: true
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+  - model: authentik_core.application
+    id: everpush-app
+    identifiers:
+      slug: everpush
+    attrs:
+      name: EverPush
+      provider: !KeyOf everpush-provider
+      meta_launch_url: https://push.everbright.it/
+      open_in_new_tab: true
+      policy_engine_mode: any
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf everpush-app
+      group: !KeyOf app-push
+    attrs:
+      order: 0
+
+  - model: authentik_providers_oauth2.oauth2provider
+    id: everfit-provider
+    identifiers:
+      name: EverFit
+    attrs:
+      authorization_flow: !Context flow_authz
+      invalidation_flow: !Context flow_invalid
+      client_type: confidential
+      client_id: everfit
+      client_secret: !Env [OIDC_SECRET_EVERFIT]
+      redirect_uris:
+        - {matching_mode: strict, url: "https://fit.everbright.it/oidc/callback", redirect_uri_type: authorization}
+        - {matching_mode: strict, url: "https://fit.everbright.it/", redirect_uri_type: logout}
+      sub_mode: hashed_user_id
+      issuer_mode: per_provider
+      include_claims_in_id_token: true
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+  - model: authentik_core.application
+    id: everfit-app
+    identifiers:
+      slug: everfit
+    attrs:
+      name: EverFit
+      provider: !KeyOf everfit-provider
+      meta_launch_url: https://fit.everbright.it/
+      open_in_new_tab: true
+      policy_engine_mode: any
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf everfit-app
+      group: !KeyOf app-fit
+    attrs:
+      order: 0
+
+  - model: authentik_providers_oauth2.oauth2provider
+    id: everflow-provider
+    identifiers:
+      name: Everflow
+    attrs:
+      authorization_flow: !Context flow_authz
+      invalidation_flow: !Context flow_invalid
+      client_type: confidential
+      client_id: everflow
+      client_secret: !Env [OIDC_SECRET_EVERFLOW]
+      redirect_uris:
+        - {matching_mode: strict, url: "https://flow.everbright.it/oidc/callback", redirect_uri_type: authorization}
+        - {matching_mode: strict, url: "https://flow.everbright.it/", redirect_uri_type: logout}
+      sub_mode: hashed_user_id
+      issuer_mode: per_provider
+      include_claims_in_id_token: true
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+  - model: authentik_core.application
+    id: everflow-app
+    identifiers:
+      slug: everflow
+    attrs:
+      name: Everflow
+      provider: !KeyOf everflow-provider
+      meta_launch_url: https://flow.everbright.it/
+      open_in_new_tab: true
+      policy_engine_mode: any
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf everflow-app
+      group: !KeyOf app-flow
+    attrs:
+      order: 0
+
+  # Forward auth applications (embedded outpost)
+  - model: authentik_providers_proxy.proxyprovider
+    id: calendar-provider
+    identifiers:
+      name: OE Copilot
+    attrs:
+      authorization_flow: !Context flow_authz
+      invalidation_flow: !Context flow_invalid
+      mode: forward_single
+      external_host: https://calendar.everbright.it
+      access_token_validity: hours=24
+  - model: authentik_core.application
+    id: calendar-app
+    identifiers:
+      slug: calendar
+    attrs:
+      name: OE Copilot
+      provider: !KeyOf calendar-provider
+      meta_launch_url: https://calendar.everbright.it/
+      open_in_new_tab: true
+      policy_engine_mode: any
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf calendar-app
+      group: !KeyOf app-calendar
+    attrs:
+      order: 0
+
+  - model: authentik_providers_proxy.proxyprovider
+    id: teams-provider
+    identifiers:
+      name: TeamsRelay
+    attrs:
+      authorization_flow: !Context flow_authz
+      invalidation_flow: !Context flow_invalid
+      mode: forward_single
+      external_host: https://teams.everbright.it
+      access_token_validity: hours=24
+  - model: authentik_core.application
+    id: teams-app
+    identifiers:
+      slug: teams
+    attrs:
+      name: TeamsRelay
+      provider: !KeyOf teams-provider
+      meta_launch_url: https://teams.everbright.it/
+      open_in_new_tab: true
+      policy_engine_mode: any
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf teams-app
+      group: !KeyOf app-teams
+    attrs:
+      order: 0
+
+  - model: authentik_outposts.outpost
+    identifiers:
+      managed: goauthentik.io/outposts/embedded
+    attrs:
+      providers:
+        - !KeyOf calendar-provider
+        - !KeyOf teams-provider

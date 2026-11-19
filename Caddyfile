@@ -1,0 +1,29 @@
+{
+	http_port 8080
+	https_port 8443
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$DOMAIN:id.everbright.it} {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		-Server
+	}
+	handle_path /everid-static/* {
+		header Cache-Control "public, max-age=3600"
+		root * /srv/static
+		file_server
+	}
+	handle {
+		reverse_proxy server:9000
+	}
+}
