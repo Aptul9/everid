@@ -62,8 +62,10 @@ jobs:
         if: always()
         run: |
           docker compose --env-file "$EVERID_ENV_FILE" ps
-          docker compose --env-file "$EVERID_ENV_FILE" logs --no-color server worker > stack.log 2>&1 || true
-          grep -v '^\s*$' stack.log | grep -vE 'Extracting|Download' | tail -120 || true
+          docker compose --env-file "$EVERID_ENV_FILE" exec -T worker ls -la /blueprints/custom || true
+          docker compose --env-file "$EVERID_ENV_FILE" logs --no-color worker > worker.log 2>&1 || true
+          grep -iE 'blueprint|"level": ?"(error|warning)"|Traceback|Error' worker.log | cut -c1-1500 | head -60 || true
+          docker compose --env-file "$EVERID_ENV_FILE" exec -T worker ak apply_blueprint custom/everid.yaml 2>&1 | cut -c1-1500 | tail -40 || true
           docker compose --env-file "$EVERID_ENV_FILE" down -v
 
   deploy:
