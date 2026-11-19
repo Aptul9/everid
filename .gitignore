@@ -1,0 +1,5 @@
+.env
+data/
+postgres/
+__pycache__/
+*.py[cod]
