@@ -63,7 +63,7 @@ jobs:
         run: |
           docker compose --env-file "$EVERID_ENV_FILE" ps
           docker compose --env-file "$EVERID_ENV_FILE" logs --no-color server worker > stack.log 2>&1 || true
-          grep -E '"level": ?"error"|Traceback' stack.log | grep -v 'outpost' | head -20 || true
+          grep -v '^\s*$' stack.log | grep -vE 'Extracting|Download' | tail -120 || true
           docker compose --env-file "$EVERID_ENV_FILE" down -v
 
   deploy:
