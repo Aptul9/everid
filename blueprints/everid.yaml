@@ -341,3 +341,10 @@ entries:
       providers:
         - !KeyOf calendar-provider
         - !KeyOf teams-provider
+      # without it the outpost sends browsers to http://localhost/application/o/authorize/
+      config:
+        authentik_host: https://id.everbright.it
+        authentik_host_browser: https://id.everbright.it
+        authentik_host_insecure: false
+        log_level: info
+        refresh_interval: minutes=5
