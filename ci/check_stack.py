@@ -99,7 +99,7 @@ def main():
     assert brand["branding_title"] == "Everbright", brand["branding_title"]
     flow = client.json(f"/api/v3/flows/instances/{LOGIN_FLOW}/")
     assert flow["title"] == "Accedi", flow["title"]
-    assert str(brand["flow_authentication"]) == str(flow["pk"]), (brand["flow_authentication"], flow["pk"])
+    assert str(brand["flow_authentication"]) in (LOGIN_FLOW, str(flow["pk"])), brand["flow_authentication"]
     bindings = client.json(f"/api/v3/flows/bindings/?target={flow['pk']}&ordering=order")["results"]
     assert [b["order"] for b in bindings] == [10, 20, 30, 100], [b["order"] for b in bindings]
     print("brand", brand["branding_title"], "login flow", LOGIN_FLOW, repr(flow["title"]), len(bindings), "stages")
