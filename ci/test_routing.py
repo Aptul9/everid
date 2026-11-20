@@ -1,7 +1,7 @@
 import unittest
 from routing import ROUTE, updated_config
 
-LIVE = '''user: "sslh";
+ONE_LINE = '''user: "sslh";
 listen: ( { host: "0.0.0.0"; port: "443"; } );
 protocols: (
   { name: "tls"; host: "127.0.0.1"; port: "4450"; sni_hostnames: [ "fit.everbright.it" ]; },
@@ -11,13 +11,32 @@ protocols: (
 );
 '''
 
+# shape of the live /etc/sslh.cfg on 2026-11-20
+TWO_LINES = '''user: "sslh";
+
+listen:
+(
+    { host: "0.0.0.0"; port: "443"; }
+);
+
+protocols:
+(
+    { name: "tls"; host: "127.0.0.1"; port: "4450"; sni_hostnames: [ "fit.everbright.it" ]; },
+    { name: "ssh"; host: "127.0.0.1"; port: "22"; },
+    { name: "tls"; host: "127.0.0.1"; port: "4443"; },
+    { name: "anyprot"; host: "127.0.0.1"; port: "4443"; }
+);
+'''
+
 
 class RoutingTests(unittest.TestCase):
     def test_only_adds_new_route_and_is_idempotent(self):
-        updated = updated_config(LIVE)
-        self.assertEqual(updated.replace("\n" + ROUTE, "", 1), LIVE)
-        self.assertLess(updated.index(ROUTE), updated.index('port: "4443"'))
-        self.assertEqual(updated_config(updated), updated)
+        for live in (ONE_LINE, TWO_LINES):
+            updated = updated_config(live)
+            self.assertEqual(updated.replace(ROUTE + "\n", "", 1), live)
+            self.assertLess(updated.index(ROUTE), updated.index('port: "4443"'))
+            self.assertLess(updated.index("protocols:"), updated.index(ROUTE))
+            self.assertEqual(updated_config(updated), updated)
 
     def test_unexpected_existing_route_is_rejected(self):
         with self.assertRaises(ValueError):
@@ -25,7 +44,7 @@ class RoutingTests(unittest.TestCase):
 
     def test_port_already_used_is_rejected(self):
         with self.assertRaises(ValueError):
-            updated_config(LIVE.replace("4450", "4451"))
+            updated_config(TWO_LINES.replace("4450", "4451"))
 
     def test_unexpected_format_is_rejected(self):
         with self.assertRaises(ValueError):

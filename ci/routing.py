@@ -1,7 +1,10 @@
 import argparse
+import re
 from pathlib import Path
 
-ROUTE = '  { name: "tls"; host: "127.0.0.1"; port: "4451"; sni_hostnames: [ "id.everbright.it" ]; },'
+ROUTE = '    { name: "tls"; host: "127.0.0.1"; port: "4451"; sni_hostnames: [ "id.everbright.it" ]; },'
+# "protocols: (" on one line, or "protocols:" and "(" on two (the live file since the EverFit route)
+OPENING = re.compile(r"^protocols:\s*\(\n", re.MULTILINE)
 
 
 def updated_config(content):
@@ -12,9 +15,9 @@ def updated_config(content):
         return content
     if '"4451"' in content:
         raise ValueError("Port 4451 already routed elsewhere; no configuration changed")
-    if content.count("protocols: (") != 1:
+    if len(OPENING.findall(content)) != 1:
         raise ValueError("Unexpected sslh configuration; no configuration changed")
-    return content.replace("protocols: (", "protocols: (\n" + ROUTE, 1)
+    return OPENING.sub(lambda m: m.group(0) + ROUTE + "\n", content, count=1)
 
 
 if __name__ == "__main__":
