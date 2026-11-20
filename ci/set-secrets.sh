@@ -53,7 +53,7 @@ done
   printf '\n## EverID\n\n'
   printf '| Field | Value |\n|---|---|\n'
   printf '| URL | `https://id.everbright.it`, [[everid]] |\n'
-  printf '| Admin | user `antonio`, `aptul4ever@gmail.com` |\n'
+  printf '| Admin | user `aptul`, `aptul4ever@gmail.com` |\n'
   printf '| Admin password | `%s` (initial; changes in EverID are not reflected here) |\n' "$ADMIN"
   printf '| Postgres password | `%s` |\n' "$PG_PASS"
   printf '| AUTHENTIK_SECRET_KEY | `%s` |\n' "$AUTHENTIK_SECRET_KEY"

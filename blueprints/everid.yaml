@@ -90,9 +90,9 @@ entries:
   # Administrator. Password set only on creation; later changes happen in EverID.
   - model: authentik_core.user
     state: created
-    id: antonio
+    id: admin
     identifiers:
-      username: antonio
+      username: aptul
     attrs:
       name: Antonio
       email: aptul4ever@gmail.com
@@ -104,7 +104,7 @@ entries:
   - model: authentik_core.user
     state: present
     identifiers:
-      username: antonio
+      username: aptul
     attrs:
       groups:
         - !KeyOf everid-admins
