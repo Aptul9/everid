@@ -67,8 +67,13 @@ for slug in everdrive everpush everfit everflow; do
     | grep -q "\"issuer\": *\"https://id.everbright.it/application/o/$slug/\""
 done
 # Forward auth from the docker0 address, as the app Caddy containers call it.
-code=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Host: calendar.everbright.it' -H 'X-Forwarded-Proto: https' \
-  -H 'X-Forwarded-Uri: /' -H 'X-Forwarded-Method: GET' http://172.17.0.1:9000/outpost.goauthentik.io/auth/caddy)
+# The embedded outpost learns the proxy providers some seconds after the blueprint: 404 until then.
+for _ in $(seq 1 36); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Host: calendar.everbright.it' -H 'X-Forwarded-Proto: https' \
+    -H 'X-Forwarded-Uri: /' -H 'X-Forwarded-Method: GET' http://172.17.0.1:9000/outpost.goauthentik.io/auth/caddy)
+  case "$code" in 302|401) break ;; esac
+  sleep 5
+done
 case "$code" in 302|401) ;; *) echo "forward auth returned $code" >&2; exit 1 ;; esac
 compose logs --tail 10 server worker
 echo "Deployment complete: $RELEASE"
