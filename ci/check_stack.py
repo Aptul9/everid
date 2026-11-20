@@ -14,6 +14,8 @@ import urllib.request
 
 APP_GROUPS = {"app-drive", "app-push", "app-fit", "app-flow", "app-calendar", "app-teams"}
 OIDC_SLUGS = ("everdrive", "everpush", "everfit", "everflow")
+# username or e-mail of the administrator, both accepted by the identification stage
+LOGIN = os.environ.get("EVERID_ADMIN_LOGIN", "aptul")
 
 
 PUBLIC_HOST = "id.everbright.it"
@@ -56,14 +58,14 @@ def login(client, password):
         component = r.get("component")
         print("stage", component)
         if component == "ak-stage-identification":
-            r = client.json(path, {"component": component, "uid_field": "antonio", "password": password})
+            r = client.json(path, {"component": component, "uid_field": LOGIN, "password": password})
         elif component == "ak-stage-password":
             r = client.json(path, {"component": component, "password": password})
         else:
             break
     if r.get("component") != "xak-flow-redirect":
         sys.exit(f"login did not complete: {r.get('component')} {r.get('response_errors')}")
-    print("login antonio ok")
+    print("login", LOGIN, "ok")
 
 
 def main():
@@ -84,8 +86,8 @@ def main():
     groups = {g["name"] for g in me["groups"]}
     assert me["email"] == "aptul4ever@gmail.com", me["email"]
     assert APP_GROUPS | {"everid-admins"} <= groups, groups
-    assert me["is_superuser"], "antonio is not admin"
-    print("antonio groups", sorted(groups))
+    assert me["is_superuser"], "admin is not superuser"
+    print("admin groups", sorted(groups))
 
     akadmin = client.json("/api/v3/core/users/?username=akadmin")["results"]
     assert akadmin and not akadmin[0]["is_active"], "akadmin still active"
