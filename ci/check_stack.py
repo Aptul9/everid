@@ -115,6 +115,9 @@ def main():
     names = sorted(outpost["providers_obj"][i]["name"] for i in range(len(outpost["providers_obj"])))
     assert names == ["OE Copilot", "TeamsRelay"], names
     print("embedded outpost", names)
+    host = outpost["config"].get("authentik_host")
+    assert host == "https://id.everbright.it", host
+    print("embedded outpost host", host)
 
 
 if __name__ == "__main__":
