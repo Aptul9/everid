@@ -22,6 +22,11 @@ entries:
   - model: authentik_blueprints.metaapplyblueprint
     attrs:
       identifiers:
+        name: Default - Authentication flow
+      required: true
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
         name: Default - Provider authorization flow (implicit consent)
       required: true
   - model: authentik_blueprints.metaapplyblueprint
@@ -35,25 +40,87 @@ entries:
         name: System - OAuth2 Provider - Scopes
       required: true
 
-  # Brand
+  # Login flow shown to people. The default authentication flow keeps its upstream title
+  # ("Welcome to authentik!"), which its own blueprint rewrites on every image upgrade;
+  # this flow reuses the same stages and policies and is never touched by default blueprints.
+  - model: authentik_flows.flow
+    id: flow-accesso
+    identifiers:
+      slug: accesso
+    attrs:
+      name: Everbright
+      title: Accedi
+      designation: authentication
+      authentication: none
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 10
+      stage: !Find [authentik_stages_identification.identificationstage, [name, default-authentication-identification]]
+      target: !KeyOf flow-accesso
+  - model: authentik_flows.flowstagebinding
+    id: accesso-password-binding
+    identifiers:
+      order: 20
+      stage: !Find [authentik_stages_password.passwordstage, [name, default-authentication-password]]
+      target: !KeyOf flow-accesso
+    attrs:
+      re_evaluate_policies: true
+  - model: authentik_flows.flowstagebinding
+    id: accesso-mfa-binding
+    identifiers:
+      order: 30
+      stage: !Find [authentik_stages_authenticator_validate.authenticatorvalidatestage, [name, default-authentication-mfa-validation]]
+      target: !KeyOf flow-accesso
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 100
+      stage: !Find [authentik_stages_user_login.userloginstage, [name, default-authentication-login]]
+      target: !KeyOf flow-accesso
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 10
+      target: !KeyOf accesso-password-binding
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name, default-authentication-flow-password-stage]]
+    attrs:
+      failure_result: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 10
+      target: !KeyOf accesso-mfa-binding
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name, default-authentication-flow-authenticator-validate-stage]]
+    attrs:
+      failure_result: true
+
+  # Brand: the central page carries the Everbright look (servizi.everbright.it), never the engine name.
   - model: authentik_brands.brand
     state: present
     identifiers:
       domain: authentik-default
     attrs:
-      branding_title: EverID
+      branding_title: Everbright
       # File picker values (2025.12+) reject absolute paths; external URLs pass through unchanged.
       branding_logo: https://id.everbright.it/everid-static/logo-icon.png
       branding_favicon: https://id.everbright.it/everid-static/icon.png
+      flow_authentication: !KeyOf flow-accesso
       branding_custom_css: |
         :root {
+          --ak-global--background-image: none !important;
           --pf-global--primary-color--100: #00b8db;
           --pf-global--primary-color--200: #0097b4;
           --pf-global--link--Color: #00b8db;
         }
+        html, body {
+          background: #000 !important;
+        }
+        /* Upstream always appends this footer item; no setting removes it. */
+        ak-brand-links li[data-track-name="start"] {
+          display: none !important;
+        }
       attributes:
         settings:
           locale: it
+          theme:
+            base: dark
 
   # Groups
   - model: authentik_core.group

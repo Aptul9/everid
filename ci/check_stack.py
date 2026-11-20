@@ -19,6 +19,8 @@ LOGIN = os.environ.get("EVERID_ADMIN_LOGIN", "aptul")
 
 
 PUBLIC_HOST = "id.everbright.it"
+# Login flow of the brand; the apps' in-app form runs the same flow server-side.
+LOGIN_FLOW = "accesso"
 
 
 class Client:
@@ -52,7 +54,7 @@ def wait_ready(client):
 
 
 def login(client, password):
-    path = "/api/v3/flows/executor/default-authentication-flow/?query="
+    path = f"/api/v3/flows/executor/{LOGIN_FLOW}/?query="
     r = client.json(path)
     for _ in range(6):
         component = r.get("component")
@@ -94,8 +96,13 @@ def main():
     print("akadmin disabled")
 
     brand = client.json("/api/v3/core/brands/current/")
-    assert brand["branding_title"] == "EverID", brand["branding_title"]
-    print("brand", brand["branding_title"])
+    assert brand["branding_title"] == "Everbright", brand["branding_title"]
+    flow = client.json(f"/api/v3/flows/instances/{LOGIN_FLOW}/")
+    assert flow["title"] == "Accedi", flow["title"]
+    assert str(brand["flow_authentication"]) == str(flow["pk"]), (brand["flow_authentication"], flow["pk"])
+    bindings = client.json(f"/api/v3/flows/bindings/?target={flow['pk']}&ordering=order")["results"]
+    assert [b["order"] for b in bindings] == [10, 20, 30, 100], [b["order"] for b in bindings]
+    print("brand", brand["branding_title"], "login flow", LOGIN_FLOW, repr(flow["title"]), len(bindings), "stages")
 
     apps = {a["slug"]: a for a in client.json("/api/v3/core/applications/?page_size=100&superuser_full_list=true")["results"]}
     for slug in OIDC_SLUGS + ("calendar", "teams"):
