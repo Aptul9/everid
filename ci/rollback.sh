@@ -19,7 +19,7 @@ test -s "$BASE/previous-release"
 PREVIOUS=$(cat "$BASE/previous-release")
 case "$PREVIOUS" in "$BASE"/releases/*) ;; *) exit 1 ;; esac
 export RELEASE=${PREVIOUS##*/}
-docker compose --project-directory "$PREVIOUS" --env-file "$BASE/.env" up -d --wait --wait-timeout 300 --remove-orphans
+docker compose --project-directory "$PREVIOUS" --env-file "$BASE/.env" up -d --wait --wait-timeout 900 --remove-orphans
 ln -sfn "$PREVIOUS" "$BASE/app.next"
 mv -Tf "$BASE/app.next" "$BASE/app"
 # Database stays in place. Pre-deploy dumps in /opt/everid/backups for a manual restore.

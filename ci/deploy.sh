@@ -46,7 +46,7 @@ if ! cmp -s /etc/sslh.cfg "$BASE/sslh.candidate"; then
   systemctl is-active --quiet sslh
 fi
 
-compose up -d --wait --wait-timeout 300 --remove-orphans
+compose up -d --wait --wait-timeout 900 --remove-orphans
 ln -sfn "$NEXT" app.next
 mv -Tf app.next app
 compose ps
