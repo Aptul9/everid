@@ -131,6 +131,7 @@ entries:
       authorization_flow: !Context flow_authz
       invalidation_flow: !Context flow_invalid
       client_type: confidential
+      grant_types: [authorization_code]
       client_id: everdrive
       client_secret: !Env [OIDC_SECRET_EVERDRIVE, null]
       redirect_uris:
@@ -169,6 +170,7 @@ entries:
       authorization_flow: !Context flow_authz
       invalidation_flow: !Context flow_invalid
       client_type: confidential
+      grant_types: [authorization_code]
       client_id: everpush
       client_secret: !Env [OIDC_SECRET_EVERPUSH, null]
       redirect_uris:
@@ -207,6 +209,7 @@ entries:
       authorization_flow: !Context flow_authz
       invalidation_flow: !Context flow_invalid
       client_type: confidential
+      grant_types: [authorization_code]
       client_id: everfit
       client_secret: !Env [OIDC_SECRET_EVERFIT, null]
       redirect_uris:
@@ -245,6 +248,7 @@ entries:
       authorization_flow: !Context flow_authz
       invalidation_flow: !Context flow_invalid
       client_type: confidential
+      grant_types: [authorization_code]
       client_id: everflow
       client_secret: !Env [OIDC_SECRET_EVERFLOW, null]
       redirect_uris:

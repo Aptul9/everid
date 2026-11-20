@@ -105,6 +105,12 @@ def main():
         assert len(bound) == 1 and bound <= APP_GROUPS, (slug, bound)
         print("application", slug, "->", bound.pop())
 
+    # The model default is an empty list: without explicit grant types every login is refused.
+    for slug in OIDC_SLUGS:
+        provider = client.json(f"/api/v3/providers/oauth2/{apps[slug]['provider']}/")
+        assert "authorization_code" in provider["grant_types"], (slug, provider["grant_types"])
+        print("provider", slug, "grant types", provider["grant_types"])
+
     outpost = client.json("/api/v3/outposts/instances/?managed__iexact=goauthentik.io/outposts/embedded")["results"][0]
     names = sorted(outpost["providers_obj"][i]["name"] for i in range(len(outpost["providers_obj"])))
     assert names == ["OE Copilot", "TeamsRelay"], names
