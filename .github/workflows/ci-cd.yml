@@ -130,7 +130,7 @@ jobs:
       - name: Public checks
         run: |
           curl --fail --silent --show-error -o /dev/null https://id.everbright.it/-/health/live/
-          curl --fail --silent --show-error -L https://id.everbright.it/ | grep -q 'EverID'
+          curl --fail --silent --show-error -L https://id.everbright.it/ | grep -q '<title>Everbright</title>'
           for slug in everdrive everpush everfit everflow; do
             curl --fail --silent --show-error -o /dev/null "https://id.everbright.it/application/o/$slug/.well-known/openid-configuration"
           done
